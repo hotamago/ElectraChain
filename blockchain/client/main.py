@@ -192,15 +192,6 @@ async def get_voter_data(public_key: str):
 async def get_candidate_data(public_key: str):
     return make_response_auto_catch(lambda: client.get_account_data(PublicKey(public_key), CandidateData, [8, 0]))
 
-# Get account info
-@app.get("/get-voter-info")
-async def get_voter_info(public_key: str):
-    return make_response_auto_catch(lambda: client.get_account_info(PublicKey(public_key)))
-
-@app.get("/get-candidate-info")
-async def get_candidate_info(public_key: str):
-    return make_response_auto_catch(lambda: client.get_account_info(PublicKey(public_key)))
-
 # Common API
 @app.post("/convert-keypair-to-private-key")
 async def convert_keypair_to_private_key(file: UploadFile):
@@ -218,12 +209,12 @@ async def get_info(public_key: str):
     return make_response_auto_catch(lambda: client.get_account_info(PublicKey(public_key)))
 
 @app.get("/get-balance")
-async def get_balance():
-    return client.get_balance()
+async def get_balance(public_key: str):
+    return make_response_auto_catch(client.get_balance(public_key))
 
 @app.post("/airdrop")
-async def airdrop(amount: int = 1):
-    return client.drop_sol(amount)
+async def airdrop(public_key: str, amount: int = 1):
+    return make_response_auto_catch(client.drop_sol(public_key, amount))
 
 # Run
 if __name__ == "__main__":
