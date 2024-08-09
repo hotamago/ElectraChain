@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, List, Literal, Optional, Text, Union
 
 from .utils import RPCRequestError, validate_commitment
@@ -627,7 +628,7 @@ class Client:
         if self.clean_response:
             if "error" in res:
                 raise RPCRequestError(
-                    f"Failed to fetch data from RPC endpoint. Error {res['error']['code']}: {res['error']['message']}")
+                    f"Failed to fetch data from RPC endpoint. Error {res['error']['code']}: {res['error']['message']}\nFull response: {json.dumps(res, indent=4)}")
 
             if isinstance(res['result'], dict) or isinstance(res['result'], list) or isinstance(res['result'], str) or res['result'] == None:
                 return res['result']

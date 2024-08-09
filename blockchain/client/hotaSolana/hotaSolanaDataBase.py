@@ -1,3 +1,8 @@
+from typing import Optional, Union
+from hotaSolana.bs58 import bs58
+import struct
+import random
+
 class BaseElement:
     def __init__(self, key="", value=""):
         self.key = key
@@ -28,6 +33,15 @@ class BaseStruct:
         self.mapName2Data = dict()
         for item in self.data:
             self.mapName2Data[item.key] = item
+
+    def random(self):
+        for item in self.data:
+            if isinstance(item.value, BaseStruct):
+                item.value.random()
+            elif isinstance(item.value, int):
+                item.value = random.randint(0, 255)
+            else:
+                raise Exception("Error data struct is not number or struct")
 
     def get(self, key):
         if key in self.mapName2Data:
@@ -130,6 +144,10 @@ class HotaArrayInt(BaseStruct):
             else:
                 data.append(BaseElement(i, HotaUint8(defaultData)))
         super().__init__(data)
+    
+    # for len
+    def __len__(self):
+        return len(self.data)
 
 # Uint 16
 
@@ -139,12 +157,18 @@ class HotaUint16(BaseStruct):
         inArray = [inUint & 0xff, (inUint >> 8) & 0xff]
         super().__init__([BaseElement("value", HotaArrayInt(2, inArray, 0))])
 
-    def struct2object(self):
+    def value(self):
         return self.get("value").get(0) + self.get("value").get(1) * 256
 
-    def object2struct(self, inUint):
+    def setValue(self, inUint):
         self.get("value").set(0, inUint & 0xff)
         self.get("value").set(1, (inUint >> 8) & 0xff)
+
+    def struct2object(self):
+        return self.value()
+
+    def object2struct(self, inUint):
+        self.setValue(inUint)
 
 # Uint 32
 
@@ -160,7 +184,7 @@ class HotaUint32(BaseStruct):
         super().__init__([BaseElement("value", HotaArrayInt(4, inArray, 0))])
         
 
-    def struct2object(self):
+    def value(self):
         return (
             self.get("value").get(0)
             + self.get("value").get(1) * 256
@@ -168,11 +192,17 @@ class HotaUint32(BaseStruct):
             + self.get("value").get(3) * 256 * 256 * 256
         )
 
-    def object2struct(self, inUint):
+    def setValue(self, inUint):
         self.get("value").set(0, inUint & 0xff)
         self.get("value").set(1, (inUint >> 8) & 0xff)
         self.get("value").set(2, (inUint >> 16) & 0xff)
         self.get("value").set(3, (inUint >> 24) & 0xff)
+
+    def struct2object(self):
+        return self.value()
+
+    def object2struct(self, inUint):
+        self.setValue(inUint)
 
 # Uint 64
 
@@ -191,7 +221,7 @@ class HotaUint64(BaseStruct):
         ]
         super().__init__([BaseElement("value", HotaArrayInt(8, inArray, 0))])
 
-    def struct2object(self):
+    def value(self):
         return (
             self.get("value").get(0)
             + self.get("value").get(1) * 256
@@ -204,7 +234,7 @@ class HotaUint64(BaseStruct):
             256 * 256 * 256 * 256 * 256
         )
 
-    def object2struct(self, inUint):
+    def setValue(self, inUint):
         self.get("value").set(0, inUint & 0xff)
         self.get("value").set(1, (inUint >> 8) & 0xff)
         self.get("value").set(2, (inUint >> 16) & 0xff)
@@ -214,6 +244,12 @@ class HotaUint64(BaseStruct):
         self.get("value").set(6, (inUint >> 48) & 0xff)
         self.get("value").set(7, (inUint >> 56) & 0xff)
 
+    def struct2object(self):
+        return self.value()
+
+    def object2struct(self, inUint):
+        self.setValue(inUint)
+
 # Uint128
 class HotaUint128(BaseStruct):
     def __init__(self, inUint=0):
@@ -222,12 +258,18 @@ class HotaUint128(BaseStruct):
         ]
         super().__init__([BaseElement("value", HotaArrayInt(16, inArray, 0))])
 
-    def struct2object(self):
+    def value(self):
         return sum([self.get("value").get(i) * (256 ** i) for i in range(16)])
     
-    def object2struct(self, inUint):
+    def setValue(self, inUint):
         for i in range(16):
             self.get("value").set(i, (inUint >> i*8) & 0xff)
+
+    def struct2object(self):
+        return self.value()
+
+    def object2struct(self, inUint):
+        self.setValue(inUint)
 
 # UintX
 class HotaUintX(BaseStruct):
@@ -237,16 +279,43 @@ class HotaUintX(BaseStruct):
         ]
         super().__init__([BaseElement("value", HotaArrayInt(lenArr, inArray, 0))])
 
-    def struct2object(self):
+    def value(self):
         return sum([self.get("value").get(i) * (256 ** i) for i in range(len(self.get("value")))])
     
-    def object2struct(self, inUint):
+    def setValue(self, inUint):
         for i in range(len(self.get("value"))):
             self.get("value").set(i, (inUint >> i*8) & 0xff)
 
+    def struct2object(self):
+        return self.value()
+
+    def object2struct(self, inUint):
+        self.setValue(inUint)
+
+# IntX
+class HotaIntX(BaseStruct):
+    def __init__(self, lenArr, inInt=0):
+        inArray = [
+            (inInt >> i*8) & 0xff for i in range(lenArr)
+        ]
+        super().__init__([BaseElement("value", HotaArrayInt(lenArr, inArray, 0))])
+
+    def value(self):
+        temp_sum = sum([self.get("value").get(i) * (256 ** i) for i in range(len(self.get("value")))])
+        temp_sum -= 256 ** len(self.get("value")) if self.get("value").get(len(self.get("value")) - 1) >= 128 else 0
+        return temp_sum
+    
+    def setValue(self, inInt):
+        for i in range(len(self.get("value"))):
+            self.get("value").set(i, (inInt >> i*8) & 0xff)
+
+    def struct2object(self):
+        return self.value()
+
+    def object2struct(self, inInt):
+        self.setValue(inInt)
+
 # String 64bit data
-
-
 class HotaString64(HotaArrayInt):
     def __init__(self, lenArr, inString=""):
         self.alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -323,7 +392,7 @@ class HotaVectorStruct(BaseStruct):
         return self.get("data").get(index)
 
     def length(self):
-        return self.data.get("length")
+        return self.get("length")
 
     def clear(self):
         self.get("length").setValue(0)
@@ -354,3 +423,127 @@ class HotaHex(BaseStruct):
         for i in range(0, len(hex), 2):
             bytes = int(hex[i:i+2], 16)
             self.get(i//2).setValue(bytes)
+
+# HotaStringUTF16
+class HotaStringUTF16(HotaArrayStruct):
+    def __init__(self, lenArr: int, inString: str = ""):
+        if len(inString) > lenArr:
+            raise Exception("Error string is too long")
+
+        inArray = []
+        for i in range(len(inString)):
+            inArray.append(HotaUint16(ord(inString[i]) + 1))
+        super().__init__(lenArr, lambda: HotaUint16(0), inArray)
+
+    def struct2object(self):
+        str = ""
+        for i in range(len(self.data)):
+            if self.get(i).value() == 0:
+                break
+            str += chr(self.get(i).value() - 1)
+        return str
+
+    def object2struct(self, inString: str):
+        if len(inString) > len(self.data):
+            raise Exception("Error string is too long")
+
+        for i in range(len(self.data)):
+            self.get(i).setValue(0)
+        for i in range(len(inString)):
+            self.get(i).setValue(ord(inString[i]) + 1)
+
+# HotaDate
+class HotaDate(BaseStruct):
+    def __init__(self, day=0, month=0, year=0):
+        super().__init__([
+            BaseElement("day", HotaUint8(day)),
+            BaseElement("month", HotaUint8(month)),
+            BaseElement("year", HotaUint16(year))
+        ])
+
+    def struct2object(self):
+        return {
+            "day": self.get("day").value(),
+            "month": self.get("month").value(),
+            "year": self.get("year").value()
+        }
+
+    def object2struct(self, object):
+        self.get("day").setValue(object["day"])
+        self.get("month").setValue(object["month"])
+        self.get("year").setValue(object["year"])
+
+# HotaPublicKey
+class HotaPublicKey(BaseStruct): # Fix length 32 bytes
+    def __init__(self, inStringB58: Optional[Union[str, bytes]] = None):
+        data = []
+        if inStringB58 is not None:
+            if isinstance(inStringB58, str):
+                inStringB58 = bs58.decode(inStringB58)
+
+            if len(inStringB58) != 32:
+                raise Exception("Error public key is not 32 bytes")
+            
+            for i in range(32):
+                data.append(BaseElement(i, HotaUint8(inStringB58[i])))
+        else:
+            for i in range(32):
+                data.append(BaseElement(i, HotaUint8(0)))
+            
+        super().__init__(data)
+
+    def struct2object(self) -> str:
+        # Convert to base58 string
+        return bs58.encode(bytes(self.serialize()))
+    
+    def object2struct(self, inStringB58: Union[str, bytes]) -> None:
+        # Convert from base58 string to bytes
+        if isinstance(inStringB58, str):
+            inStringB58 = bs58.decode(inStringB58)
+        
+        if len(inStringB58) != 32:
+            raise Exception("Error public key is not 32 bytes")
+
+        for i in range(32):
+            self.get(i).setValue(inStringB58[i])
+
+# IEEE 754 float
+# Float 32
+class HotaFloat32(BaseStruct):
+    def __init__(self, inFloat=0.0):
+        inArray = list(struct.pack("!f", inFloat))
+        super().__init__([BaseElement("value", HotaArrayInt(4, inArray, 0))])
+
+    def value(self):
+        return struct.unpack("!f", bytes(self.serialize()))[0]
+    
+    def setValue(self, inFloat):
+        inArray = list(struct.pack("!f", inFloat))
+        for i in range(4):
+            self.get("value").set(i, inArray[i])
+
+    def struct2object(self):
+        return self.value()
+    
+    def object2struct(self, inFloat):
+        self.setValue(inFloat)
+    
+# Float 64
+class HotaFloat64(BaseStruct):
+    def __init__(self, inFloat=0.0):
+        inArray = list(struct.pack("!d", inFloat))
+        super().__init__([BaseElement("value", HotaArrayInt(8, inArray, 0))])
+
+    def value(self):
+        return struct.unpack("!d", bytes(self.serialize()))[0]
+    
+    def setValue(self, inFloat):
+        inArray = list(struct.pack("!d", inFloat))
+        for i in range(8):
+            self.get("value").set(i, inArray[i])
+    
+    def struct2object(self):
+        return self.value()
+    
+    def object2struct(self, inFloat):
+        self.setValue(inFloat)

@@ -118,8 +118,44 @@ def createProblemAddress(bump: bytes, pubkey: PublicKey, seed: str, program_id: 
 
 def findProgramAddress(pubKey: PublicKey, seed: str, program_id: PublicKey):
     for i in range(255, 0, -1):
-        pubkey = createProblemAddress(bytes([i]), pubKey, seed, program_id)
+        pubkey_seed = createProblemAddress(bytes([i]), pubKey, seed, program_id)
 
-        if not ed25519.isOnCurve(pubkey.byte_value.hex()):
-            return pubkey
+        if not ed25519.isOnCurve(pubkey_seed.byte_value.hex()):
+            return pubkey_seed
     return None
+
+# Only bytes
+def makeKeyPairWithSeed(seed: bytes, program_id: PublicKey):
+    databytes = bytearray()
+    databytes.extend(seed)
+    databytes.extend(program_id.byte_value)
+
+    hashRandom = hashlib.sha256(bytes(databytes))
+    
+    esPairKey = SigningKey(bytes(hashRandom.digest()))
+    return Keypair.from_private_key(bs58.encode(esPairKey.__dict__["_signing_key"]))
+
+def createProblemAddress(bump: bytes, seed: bytes, program_id: PublicKey):
+    databytes = bytearray()
+    databytes.extend(seed)
+    databytes.extend(bump)
+    databytes.extend(program_id.byte_value)
+    databytes.extend(textEncodeASCII("ProgramDerivedAddress"))
+
+    hashRandom = hashlib.sha256(bytes(databytes))
+
+    return PublicKey(hashRandom.digest())
+
+def findProgramAddress(seed: bytes, program_id: PublicKey):
+    for i in range(255, 0, -1):
+        pubkey_seed = createProblemAddress(bytes([i]), seed, program_id)
+
+        if not ed25519.isOnCurve(pubkey_seed.byte_value.hex()):
+            return pubkey_seed
+    return None
+
+def createBytesFromArrayBytes(*array_bytes):
+    bytes_data = bytearray()
+    for byte in array_bytes:
+        bytes_data.extend(byte)
+    return bytes(bytes_data)
